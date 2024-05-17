@@ -44,12 +44,12 @@ jobs:
 
       - uses: wcenterprises/digital-is-build-actions/init@v1.1
         with:
-          package-name: '[PROJECT-NAME]'
+          package-name: 'Jh.Sample-22'
           azdo-token: '${{ secrets.AZDO_NUGET_REPO }}'
 
       - name: restore
         run: |
-          dotnet restore '[SOLUTION-NAME]'
+          dotnet restore 'Jh.Sample-22.sln'
         shell: pwsh
         working-directory: '${{ github.workspace }}/source'
 
@@ -59,8 +59,8 @@ jobs:
 
           Write-Output "building..."
 
-          write-output "##[group]build: [SOLUTION-NAME]"
-          dotnet build '[SOLUTION-NAME]' `
+          write-output "##[group]build: Jh.Sample-22.sln"
+          dotnet build 'Jh.Sample-22.sln' `
               --no-restore `
               --configuration release `
               -p:Copyright="${env:BA_PACKAGE_COPYRIGHT}" `
@@ -81,8 +81,8 @@ jobs:
 
       - name: test
         run: |
-          write-output "##[group]test: [SOLUTION-NAME]"
-          dotnet test [SOLUTION-NAME] `
+          write-output "##[group]test: Jh.Sample-22.sln"
+          dotnet test Jh.Sample-22.sln `
               --blame `
               --no-build `
               --no-restore `

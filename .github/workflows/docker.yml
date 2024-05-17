@@ -23,7 +23,7 @@ jobs:
       - uses: wcenterprises/digital-is-build-actions/init@v4
         id: init
         with:
-          package-name: '[PROJECT-NAME]'
+          package-name: 'Jh.Sample-22'
 
       - name: Setup
         id: setup

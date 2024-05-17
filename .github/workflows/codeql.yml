@@ -95,7 +95,7 @@ jobs:
 
     - name: Build
       run: |
-        dotnet build "source/[SOLUTION-NAME]" `
+        dotnet build "source/Jh.Sample-22.sln" `
           --configuration release `
           --verbosity minimal `
           -p:TreatWarningsAsErrors=false `

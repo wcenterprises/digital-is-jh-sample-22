@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: [PROJECT-OWNER]/digital-is-build-actions/jira/validate@v3.1
+    - uses: wcenterprises/digital-is-build-actions/jira/validate@v3.1
       with:
         jira-token: ${{ secrets.JIRA_TOKEN }}

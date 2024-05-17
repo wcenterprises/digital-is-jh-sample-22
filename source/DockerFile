@@ -11,7 +11,7 @@ EXPOSE 443
 EXPOSE 8080
 EXPOSE 8081
 
-FROM docker.artifactory.[PROJECT-OWNER]-tools.com/[PROJECT-OWNER]-ca:latest AS [PROJECT-OWNER]-ca
+FROM docker.artifactory.wcenterprises-tools.com/wcenterprises-ca:latest AS wcenterprises-ca
 
 FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 WORKDIR /src
@@ -51,11 +51,11 @@ FROM base AS final
 WORKDIR /app
 
 # Used to communicate with vault.
-COPY --from=[PROJECT-OWNER]-ca /certs/* /usr/local/share/ca-certificates/
+COPY --from=wcenterprises-ca /certs/* /usr/local/share/ca-certificates/
 
 # Disable the invariant mode (set in base image)
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 COPY --from=publish /app .
 
-ENTRYPOINT ["dotnet", "[PROJECT-NAME].Service.Implementation.dll"]
+ENTRYPOINT ["dotnet", "Jh.Sample-22.Service.Implementation.dll"]

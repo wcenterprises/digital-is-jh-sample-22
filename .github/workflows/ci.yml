@@ -46,20 +46,20 @@ jobs:
       - uses: wcenterprises/digital-is-build-actions/init@v3.1
         id: build-init
         with:
-          package-name: '[PROJECT-NAME]'
+          package-name: 'Jh.Sample-22'
           azdo-token: '${{ secrets.AZDO_NUGET_REPO }}'
           artifactory-username: ${{ secrets.ARTIFACTORY_USERNAME }}
           artifactory-password: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
       - name: restore
         run: |
-          dotnet restore '[SOLUTION-NAME]'
+          dotnet restore 'Jh.Sample-22.sln'
         shell: pwsh
 
       - name: build
         run: |
-          write-output "##[group]build: [SOLUTION-NAME]"
-          dotnet build '[SOLUTION-NAME]' `
+          write-output "##[group]build: Jh.Sample-22.sln"
+          dotnet build 'Jh.Sample-22.sln' `
               --no-restore `
               --configuration release `
               -p:Copyright="${{ steps.build-init.outputs.package-copyright }}" `
@@ -79,8 +79,8 @@ jobs:
 
       - name: publish
         run: | 
-          write-output "##[group]publish: [SOLUTION-NAME]"
-          dotnet publish [SOLUTION-NAME] `
+          write-output "##[group]publish: Jh.Sample-22.sln"
+          dotnet publish Jh.Sample-22.sln `
               --property:PublishDir="${{ steps.build-init.outputs.build-output-path }}" `
               --configuration release `
               --no-build `

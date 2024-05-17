@@ -1,4 +1,4 @@
-library identifier: "[PROJECT-OWNER]-jenkins-shared-pipelines@v1", changelog: false
+library identifier: "wcenterprises-jenkins-shared-pipelines@v1", changelog: false
 library identifier: "environments@master", changelog: false
 
 properties(
@@ -21,7 +21,7 @@ if (env.BRANCH_NAME == "main") {
         // hard coding for now
         appName = "{{ REPO-NAME }}"
     }
-    [PROJECT-OWNER]EnvironmentsApplicationDeploy(
+    wcenterprisesEnvironmentsApplicationDeploy(
         appNames: [appName],
         slackChannel: "{{ SLACK-CHANNEL }}",
         slackTeamName: "{{ SLACK-TEAM }}",
