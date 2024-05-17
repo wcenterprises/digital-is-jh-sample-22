@@ -1,0 +1,61 @@
+
+#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
+
+#Depending on the operating system of the host machines(s) that will build or run the containers, the image specified in the FROM statement may need to be changed.
+#For more information, please see https://aka.ms/containercompat
+
+FROM mcr.microsoft.com/dotnet/aspnet:6.0 AS base
+WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+EXPOSE 8080
+EXPOSE 8081
+
+FROM docker.artifactory.[PROJECT-OWNER]-tools.com/[PROJECT-OWNER]-ca:latest AS [PROJECT-OWNER]-ca
+
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+WORKDIR /src
+COPY ./source/. .
+
+FROM build AS publish
+ARG AZDO_SECRET
+ARG GITHUB_SECRET
+ARG BUILD_VERSION
+ARG BUILD_REVISION
+ARG COPYRIGHT
+ARG COMPANY
+ARG AUTHORS
+ARG ASSEMBLY_VERSION
+ARG INFORMATIONAL_VERSION
+
+RUN dotnet nuget add source \
+        --username USERNAME \
+        --password $AZDO_SECRET \
+        --store-password-in-clear-text \
+        --name IS-Nuget "https://pkgs.dev.azure.com/JackHenry/_packaging/IS-Nuget/nuget/v3/index.json"
+
+RUN dotnet publish \
+        --configuration Release \
+        --output /app \
+        --version-suffix $BUILD_REVISION \
+        -p:Copyright="$COPYRIGHT" \
+        -p:Authors="$AUTHORS"  \
+        -p:Company="$COMPANY" \
+        -p:AssemblyVersion="$ASSEMBLY_VERSION" \
+        -p:FileVersion="$ASSEMBLY_VERSION" \
+        -p:InformationalVersion="$INFORMATIONAL_VERSION" \
+        -p:TrimUnusedDependencies=true \
+        --verbosity minimal
+
+FROM base AS final
+WORKDIR /app
+
+# Used to communicate with vault.
+COPY --from=[PROJECT-OWNER]-ca /certs/* /usr/local/share/ca-certificates/
+
+# Disable the invariant mode (set in base image)
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+
+COPY --from=publish /app .
+
+ENTRYPOINT ["dotnet", "[PROJECT-NAME].Service.Implementation.dll"]

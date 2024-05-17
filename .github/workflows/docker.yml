@@ -1,0 +1,85 @@
+name: Docker Image CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Log level"
+        required: true
+        default: "warning"
+      tags:
+        description: "Test scenario tags"
+
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: wcenterprises/digital-is-build-actions/init@v4
+        id: init
+        with:
+          package-name: '[PROJECT-NAME]'
+
+      - name: Setup
+        id: setup
+        run: |
+          dockerImage="${{ github.event.repository.name }}"
+          echo "REVISION=${{ steps.init.outputs.version-revision }}" >> $GITHUB_OUTPUT
+          echo "BASE_VERSION=${{ steps.init.outputs.version-major}}.2.${{ steps.init.outputs.version-build }}" >> $GITHUB_OUTPUT
+          echo "DOCKER_IMAGE_NAME=$(echo ${dockerImage//[.]/-} | tr [:upper:] [:lower:])" >> $GITHUB_OUTPUT
+
+      - name: Login to Artifactory Docker
+        uses: docker/login-action@v3
+        with:
+          registry: docker.artifactory.wcenterprises-tools.com
+          username: ${{ secrets.ARTIFACTORY_USERNAME }}
+          password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: Build the Docker image
+        run: |
+          docker build . \
+            --file ./source/Dockerfile \
+            --build-arg GITHUB_SECRET=${{ secrets.AUTOBOT_GITHUB_TOKEN }} \
+            --build-arg AZDO_SECRET=${{ secrets.AZDO_NUGET_REPO }} \
+            --build-arg BUILD_VERSION=${{ steps.init.outputs.version }} \
+            --build-arg BUILD_REVISION=${{ steps.setup.outputs.version-revision }} \
+            --build-arg COPYRIGHT="${{ steps.init.outputs.package-copyright }}" \
+            --build-arg COMPANY="${{ steps.init.outputs.package-company }}" \
+            --build-arg AUTHORS="${{ steps.init.outputs.package-authors }}" \
+            --build-arg ASSEMBLY_VERSION=${{ steps.init.outputs.version }} \
+            --build-arg INFORMATIONAL_VERSION=${{ steps.init.outputs.version-informational }}+${{ github.sha }} \
+            --tag docker.artifactory.wcenterprises-tools.com/${{ steps.setup.outputs.BASE_VERSION }} \
+            --tag docker.artifactory.wcenterprises-tools.com/${{ steps.setup.outputs.DOCKER_IMAGE_NAME }}:${{ steps.init.outputs.version }} \
+            --tag docker.artifactory.wcenterprises-tools.com/${{ steps.setup.outputs.DOCKER_IMAGE_NAME }}:${{ github.sha }}
+
+          mkdir -p docker/artifact
+          docker save docker.artifactory.wcenterprises-tools.com/${{ steps.setup.outputs.DOCKER_IMAGE_NAME }} > docker/artifact/${{ steps.setup.outputs.DOCKER_IMAGE_NAME }}.tar
+
+      - name: Save Docker Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.setup.outputs.DOCKER_IMAGE_NAME }}-artifact
+          path: docker/artifact
+          retention-days: 1
+          
+      - name: Push tag
+        if: github.ref == 'refs/heads/main'
+        uses: wcenterprises/github-tag-action@1.35.0
+        id: semrel
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: false
+          RELEASE_BRANCHES: "main"
+          CUSTOM_TAG: ${{ steps.setup.outputs.BASE_VERSION }}.${{ steps.setup.outputs.REVISION }}
+
+      - name: Push the Docker image to the registry
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker push \
+            --all-tags \
+            docker.artifactory.wcenterprises-tools.com/${{ steps.setup.outputs.DOCKER_IMAGE_NAME }}

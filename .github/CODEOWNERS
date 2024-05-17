@@ -1,0 +1,9 @@
+#
+# CODEOWNERS Generated [DATE]
+#
+
+* @[PROJECT-OWNER]/digital-is-superusers [CODE-OWNERS]
+
+*.yml @[PROJECT-OWNER]/digital-is-build
+/build/ @[PROJECT-OWNER]/digital-is-build
+/.github/ @[PROJECT-OWNER]/digital-is-build

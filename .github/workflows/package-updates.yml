@@ -1,0 +1,158 @@
+name: update-packages
+#UTC Time, Central is 6 hours behind UTC, 24 hour time format.
+on:
+  schedule:
+    - cron: "0 10,22 * * *"
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: "Log level"
+        required: true
+        default: "warning"
+        type: choice
+        options:
+          - info
+          - warning
+          - debug
+
+jobs:
+  update-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: 
+          fetch-depth: 0
+      - name: Package Updates
+        run: |
+          dotnet nuget add source `
+              --username "AutoUpdates" `
+              --password "${{ secrets.AZDO_NUGET_REPO }}" `
+              --store-password-in-clear-text `
+              --name IS-Nuget "https://pkgs.dev.azure.com/JackHenry/_packaging/IS-Nuget/nuget/v3/index.json"
+
+          git config --global user.email "you@example.com"
+          git config --global user.name "AutoUpdates"
+
+          # only update the nuget packages that start with 'Jha.'
+          Set-Variable -Name "PACKAGEIDSTARTSWITH" -Value "Jha." -Option Constant
+
+          # jira ticket
+          Set-Variable -Name "DEFAULTJIRATICKET" -Value "BSL-2921" -Option Constant
+          $JiraTicket  = "${{ vars.PACKAGE_UPDATE_JIRA_TICKET }}"
+
+          if (-NOT $JiraTicket) {
+              $JiraTicket = $DefaultJiraTicket
+          }
+
+          # the name of the feature branch that is created.
+          Set-Variable -Name "FEATUREBRANCH" -Value "update-bot/package-updates" -Option Constant
+
+          $branchExists = git ls-remote --heads origin $featureBranch
+          
+          Write-Host "Branch Exists: " $branchExists
+
+          # creates new branch.
+          function Add-NewBranch {   
+              if ($branchExists) {
+                  git checkout $featureBranch
+              }
+              else {
+                  git checkout -b $featureBranch
+              }
+
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Error "Failed to create a new branch." 
+                  exit 1
+              }          
+          }
+
+          # pushes the new branch.
+          function Push-NewBranch {
+              git add -A
+              git commit -m "Updating Jha.* Packages."
+
+              if ($branchExists) {
+                  git push origin HEAD:$featureBranch
+              }
+              else {
+                  git push -u origin $featureBranch
+              }
+
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Error "Failed to push new branch." 
+                  exit 1
+              } 
+          }
+
+          # creates a pull request.
+          function Add-PullRequest {
+
+              $prState = gh pr view --json state | ConvertFrom-Json
+
+              Write-Host "PR State " $prState.state
+
+              if ($null -eq $prState -or $prState.state -eq "CLOSED" -or $prState.state -eq "MERGED" ) {
+                  $body = "Description: Updating Jha.* Packages. `r`nJira-Tickets: $JiraTicket`r`n"
+                  gh pr create --title "Jha.* Packages Updates (Bump)" --body $body
+              }
+
+              Write-Host "PR State " $prState.state
+
+              Write-Host "PR Data " $prState
+
+              if ($LASTEXITCODE -ne 0) {
+                  Write-Error "Failed to create a pull request." 
+                  exit 1
+              } 
+          }
+
+          # update with dotnet commands.
+          function Update-WithDotNet {
+              [CmdletBinding()]
+              param(
+                  [Parameter(mandatory = $true)]
+                  [string] $projectFileName,
+                  [Parameter(mandatory = $true)]
+                  [string] $packageName
+              )
+              dotnet add $projectFileName package $packageName
+          }
+
+          Write-Host "Updating project " $ProjectsToInclude.projects 
+
+          # create new feature branch
+          Add-NewBranch 
+
+          # get the cs proj files
+          $csProjFiles = Get-ChildItem -Path ${GITHUB_WORKSPACE} -Force -Recurse -Include "*.csproj"
+          Write-Host "CSProj Files: $csProjFiles"
+
+          # loop through the cs proj files 
+          foreach ($childItem in $csProjFiles) {
+
+              [xml]$xmlElm = Get-Content -Path $childItem
+
+              $xmlElm.Project.ItemGroup.PackageReference | Where-Object {
+                  $_.include -ne $null -and $_.include.StartsWith($PackageIdStartsWith)  
+              } | ForEach-Object {
+                  Write-Host "Updating reference " $_.include
+                  Update-WithDotNet -projectFileName $childItem -packageName $_.include
+              }
+          }
+
+          if (-not (git status --porcelain)) { 
+              Write-Host "Clean!" 
+              Write-Host "All files up-to-date for" ${GITHUB_WORKSPACE}
+          }
+          else {
+              Write-Host "Not Clean!" 
+              # commit branch
+              Write-Host "Commiting branch."
+              Push-NewBranch
+              # create PR
+              Write-Host "Creating pull request for branch $featureBranch."
+              Add-PullRequest
+          }
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.AUTOBOT_GITHUB_TOKEN }}

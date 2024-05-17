@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  # Allow manual build
+  workflow_dispatch:
+
+  # Build on push to main
+  push:
+    branches:
+      - main
+    paths:
+      - '**/**'
+      - '!docs/**'
+      - '!build/**'
+      - '!azure-pipelines*'
+      - '!**/*.md'
+      - '!**/*.txt'
+      - '!**/unit-tests.yml'
+      - '!**/codeql.yml'      
+
+  # Build every 6 months if not built already
+  schedule:
+    - cron: '0 1 1 */6 *'
+        
+jobs:
+  build-project:
+    name: Build Project
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+  
+      - uses: nuget/setup-nuget@v2
+        with:
+          nuget-version: 'latest'
+          nuget-api-key: ${{ secrets.AZDO_NUGET_REPO }}        
+
+      - uses: wcenterprises/digital-is-build-actions/init@v3.1
+        id: build-init
+        with:
+          package-name: '[PROJECT-NAME]'
+          azdo-token: '${{ secrets.AZDO_NUGET_REPO }}'
+          artifactory-username: ${{ secrets.ARTIFACTORY_USERNAME }}
+          artifactory-password: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+      - name: restore
+        run: |
+          dotnet restore '[SOLUTION-NAME]'
+        shell: pwsh
+
+      - name: build
+        run: |
+          write-output "##[group]build: [SOLUTION-NAME]"
+          dotnet build '[SOLUTION-NAME]' `
+              --no-restore `
+              --configuration release `
+              -p:Copyright="${{ steps.build-init.outputs.package-copyright }}" `
+              -p:Authors="${{ steps.build-init.outputs.package-authors }}" `
+              -p:Company="${{ steps.build-init.outputs.package-company }}" `
+              -p:AssemblyVersion="${{ steps.build-init.outputs.version-prefix }}" `
+              -p:FileVersion="${{ steps.build-init.outputs.version-prefix }}" `
+              -p:InformationalVersion="${{ steps.build-init.outputs.version-informational }}+${{ github.sha }}" `
+              -p:TrimUnusedDependencies=true `
+              -p:IsOnBuildAgent=true `
+              -p:CodeAnalysisTreatWarningsAsErrors=true `
+              -warnaserror `
+              -p:_SkipUpgradeNetAnalyzersNuGetWarning=true
+          write-output "##[endgroup]"
+        shell: pwsh
+        working-directory: '${{ github.workspace }}/source'
+
+      - name: publish
+        run: | 
+          write-output "##[group]publish: [SOLUTION-NAME]"
+          dotnet publish [SOLUTION-NAME] `
+              --property:PublishDir="${{ steps.build-init.outputs.build-output-path }}" `
+              --configuration release `
+              --no-build `
+              --no-self-contained `
+              --no-restore `
+              --nologo `
+              -p:TrimUnusedDependencies=true `
+              -p:ErrorOnDuplicatePublishOutputFiles=false 
+          write-output "##[endgroup]"
+        shell: pwsh
+        working-directory: '${{ github.workspace }}/source'
+
+      - uses: wcenterprises/digital-is-build-actions/package@v3.1
+
+      - uses: wcenterprises/digital-is-build-actions/release@v3.1
+      

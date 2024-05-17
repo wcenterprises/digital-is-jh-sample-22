@@ -1,0 +1,104 @@
+name: unit-tests
+
+on:
+  # Allow manual build
+  workflow_dispatch:
+
+  # Build on push to main
+  push:
+    branches:
+      - main
+    paths:
+      - '**/**'
+      - '!docs/**'
+      - '!build/**'
+      - '!azure-pipelines*'
+      - '!**/*.md'
+      - '!**/*.txt'
+      - '!**/ci.yml'
+      - '!**/codeql.yml'
+
+  # Build every 6 months if not built already
+  schedule:
+    - cron: '0 1 1 */6 *'
+        
+jobs:
+  test-project:
+    name: Run Unit Tests
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v4
+        
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            6.x
+            8.x
+  
+      - uses: nuget/setup-nuget@v2
+        with:
+          nuget-version: 'latest'
+          nuget-api-key: ${{ secrets.AZDO_NUGET_REPO }}        
+
+      - uses: wcenterprises/digital-is-build-actions/init@v1.1
+        with:
+          package-name: '[PROJECT-NAME]'
+          azdo-token: '${{ secrets.AZDO_NUGET_REPO }}'
+
+      - name: restore
+        run: |
+          dotnet restore '[SOLUTION-NAME]'
+        shell: pwsh
+        working-directory: '${{ github.workspace }}/source'
+
+      - name: build
+
+        run: |
+
+          Write-Output "building..."
+
+          write-output "##[group]build: [SOLUTION-NAME]"
+          dotnet build '[SOLUTION-NAME]' `
+              --no-restore `
+              --configuration release `
+              -p:Copyright="${env:BA_PACKAGE_COPYRIGHT}" `
+              -p:Authors="${env:BA_PACKAGE_AUTHORS}" `
+              -p:Company="${env:BA_PACKAGE_COMPANY}" `
+              -p:AssemblyVersion="${evn:BA_VERSION_PREFIX}" `
+              -p:FileVersion="${env:BA_VERSION}" `
+              -p:InformationalVersion="${env:BA_INFORMATIONALVERSION}+${{ github.sha }}" `
+              -p:TrimUnusedDependencies=true `
+              -p:IsOnBuildAgent=true `
+              -p:CodeAnalysisTreatWarningsAsErrors=true `
+              -warnaserror `
+              -p:_SkipUpgradeNetAnalyzersNuGetWarning=true
+          write-output "##[endgroup]"
+
+        shell: pwsh
+        working-directory: '${{ github.workspace }}/source'
+
+      - name: test
+        run: |
+          write-output "##[group]test: [SOLUTION-NAME]"
+          dotnet test [SOLUTION-NAME] `
+              --blame `
+              --no-build `
+              --no-restore `
+              --configuration release `
+              --filter TestCategory=UnitTest `
+              --collect "Code Coverage" `
+              --logger trx `
+              --results-directory '${{ github.workspace }}/TestResults'
+
+          write-output "##[endgroup]"
+        shell: pwsh
+        working-directory: '${{ github.workspace }}/source'
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:  
+          name: 'TestResults'
+          path: '${{ github.workspace }}/TestResults'
+          if-no-files-found: error

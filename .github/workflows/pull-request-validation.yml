@@ -1,0 +1,13 @@
+name: Pull Request Validation
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate-jira-issues:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: wcenterprises/digital-is-build-actions/jira/validate@v3.1
+      with:
+        jira-token: ${{ secrets.JIRA_TOKEN }}

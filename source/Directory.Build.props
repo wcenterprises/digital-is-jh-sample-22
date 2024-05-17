@@ -1,0 +1,29 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <!-- Update this version number to adopt a new default version of NetAnalyzers -->
+        <!--https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/overview?tabs=net-6#latest-updates-->
+        <AnalysisLevel>6.0</AnalysisLevel>
+    </PropertyGroup>
+
+
+    <PropertyGroup>    
+        <!-- 
+        Use the methods provided by System.IO.Path to build the various paths. Doing so ensures paths are assembled 
+        correctly regardless of operating system since the plan is to include linux for builds of dotnet core components
+        -->
+        <JhaProjectDirectory>$([System.IO.Path]::GetFullPath($([System.IO.Path]::Combine($(MSBuildThisFileDirectory), "../"))))</JhaProjectDirectory>
+        <JhaProjectBuildDirectory>$([System.IO.Path]::Combine($(JhaProjectDirectory), "build"))</JhaProjectBuildDirectory>
+        <JhaProjectDocsDirectory>$([System.IO.Path]::Combine($(JhaProjectDirectory), "docs"))</JhaProjectDocsDirectory>
+        <JhaProjectToolsDirectory>$([System.IO.Path]::Combine($(JhaProjectDirectory), "tools"))</JhaProjectToolsDirectory>
+        <JhaSolutionDir>$([System.IO.Path]::Combine($(JhaProjectDirectory), "source"))</JhaSolutionDir>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <TreatWarningsAsErrors Condition=" '$(Configuration)' == 'Release' ">true</TreatWarningsAsErrors>
+        <TreatWarningsAsErrors Condition=" '$(Configuration)' == 'Debug' ">false</TreatWarningsAsErrors>
+        <NoWarn>$(nowarn),CS1998,3024</NoWarn>
+        <AnalysisMode>AllEnabledByDefault</AnalysisMode>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    </PropertyGroup>
+
+</Project>
